@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manual Audit</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--ink:#1c2430;--mut:#667085;--red:#c00;--navy:#06245c;--line:#e3e6ea;--hi:#1a8f4c;--mid:#d98a00;--lo:#c62828}
+@media(prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b212a;--ink:#e8ecf1;--mut:#9aa4b2;--navy:#9db8f5;--line:#2c3441}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 60px}header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+h1{margin:0;font-size:24px}a{color:var(--navy)}.mut{color:var(--mut);font-size:13px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.tabs button{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:99px;padding:5px 14px;cursor:pointer;font:inherit;font-size:13px}.tabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.ev{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--mid);border-radius:10px;padding:14px;margin-bottom:12px}
+.ev.approved,.ev.auto_approved,.ev.not_required{border-left-color:var(--hi)}.ev.rejected{border-left-color:var(--lo)}
+.top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.vals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}@media(max-width:700px){.vals{grid-template-columns:1fr}}
+.box{background:var(--bg);border-radius:8px;padding:8px 10px}.box b{display:block;font-size:12px;color:var(--mut);font-weight:600}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;color:#fff}.confirmed{background:var(--hi)}.corrected{background:var(--mid)}.newly_provided{background:#2b6cb0}.unconfirmed,.ambiguous{background:var(--lo)}.not_answered{background:#888}
+.why{color:var(--lo);font-size:13px}.q{border-left:3px solid var(--line);padding-left:8px;margin:6px 0;color:var(--mut)}
+input{font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}button.a{border:0;border-radius:6px;padding:7px 14px;color:#fff;cursor:pointer;font:inherit}.ok{background:var(--hi)}.no{background:var(--lo)}.ed{background:var(--navy)}
+details{margin-top:6px}summary{cursor:pointer;color:var(--mut);font-size:13px}pre{font-size:12px;overflow:auto;background:var(--bg);padding:8px;border-radius:6px}
+.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:13px}.stat b{font-size:18px;display:block}
+</style></head><body><main>
+<header><h1>Manual audit</h1><span><a href="/">Call demo</a> · <a href="/enrich">Enrichment prototype</a></span></header>
+<div class="stats" id="stats"></div>
+<div class="tabs" id="tabs"></div>
+<div class="bar"><input id="seller" placeholder="filter by seller id (e.g. D001)" size="26"> <span class="mut">Review rules and scoring: </span><a href="/api/scoring" target="_blank">/api/scoring</a></div>
+<div id="list" style="margin-top:12px"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const api=(p,b)=>fetch(p,b?{method:'POST',body:JSON.stringify(b)}:{}).then(r=>r.json());
+const TABS=[['pending','Pending review'],['approved','Approved by reviewer'],['rejected','Rejected'],['auto_approved','Auto-approved'],['not_required','No audit needed'],['','All events']];
+let tab='pending';
+$('tabs').innerHTML=TABS.map(([k,l])=>`<button data-k="${k}" class="${k===tab?'on':''}">${l}</button>`).join('');
+$('tabs').onclick=e=>{if(e.target.dataset.k===undefined)return;tab=e.target.dataset.k;[...$('tabs').children].forEach(b=>b.classList.toggle('on',b.dataset.k===tab));load()};
+$('seller').oninput=()=>load();
+async function load(){
+  const s=await api('/api/stats');$('stats').innerHTML=`<div class="stat"><b>${s.events}</b>events</div>`+Object.entries(s.byAudit).map(([k,v])=>`<div class="stat"><b>${v}</b>${k.replace('_',' ')}</div>`).join('');
+  const q=new URLSearchParams();if(tab)q.set('status',tab);if($('seller').value)q.set('seller',$('seller').value.trim());
+  const evs=await api('/api/audit?'+q);
+  $('list').innerHTML=evs.length?evs.map(card).join(''):'<p class="mut">Nothing here.</p>'}
+const show=(e,which)=>{const v=which==='prev'?e.previous_value:e.new_value;return v==null||v===''?'<i class="mut">(empty)</i>':esc(v)};
+function card(e){
+  const pend=e.audit_status==='pending',f=e.confidence_factors||{};
+  return `<div class="ev ${e.audit_status}" id="e${e.id}">
+  <div class="top"><div><b>${esc(e.company||e.seller_id)}</b> <span class="mut">#${esc(e.seller_id)} · ${esc(e.field)} · ${esc(e.created_at.slice(0,19).replace('T',' '))}</span></div>
+  <div><span class="pill ${e.classification}">${e.classification.replace('_',' ')}</span> <span class="mut">${e.audit_status.replace('_',' ')}${e.reviewer?' by '+esc(e.reviewer):''}</span></div></div>
+  <div class="vals"><div class="box"><b>PREVIOUS (${esc(e.original_source)})</b>${show(e,'prev')}</div><div class="box"><b>PROPOSED${e.final_value?' → FINAL: '+esc(e.final_value):''}</b>${show(e,'new')}</div></div>
+  ${e.audit_reasons.length?`<div class="why">Flagged: ${e.audit_reasons.map(esc).join('; ')}</div>`:''}
+  <div class="q">Seller: “${esc(e.evidence||e.utterance||'(no speech)')}”</div>
+  <div class="mut">Extraction confidence <b>${e.extraction_confidence}</b> · Estimated value reliability <b>${e.value_reliability}</b> · verification: ${esc(e.verification_status)} (estimates, not calibrated probabilities)</div>
+  <details><summary>Score breakdown</summary><pre>${esc(JSON.stringify(f,null,1))}</pre></details>
+  ${e.reviewer_note?`<div class="mut">Reviewer note: ${esc(e.reviewer_note)}</div>`:''}
+  ${pend?`<div class="act"><input id="v${e.id}" placeholder="optional: corrected value" size="30"><input id="n${e.id}" placeholder="note" size="22">
+  <button class="a ok" onclick="decide(${e.id},'approve')">Approve</button><button class="a ed" onclick="decide(${e.id},'edit')">Approve with my value</button><button class="a no" onclick="decide(${e.id},'reject')">Reject (keep previous)</button></div>`:''}</div>`}
+async function decide(id,kind){
+  const v=$('v'+id).value.trim(),note=$('n'+id).value;
+  if(kind==='edit'&&!v){alert('Type the corrected value first.');return}
+  await api('/api/audit/'+id+'/decision',{decision:kind==='reject'?'reject':'approve',value:kind==='edit'?v:undefined,note,reviewer:'demo-reviewer'});
+  load()}
+load();
+</script></body></html>

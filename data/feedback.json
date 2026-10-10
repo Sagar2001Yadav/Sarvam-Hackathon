@@ -1,0 +1,24 @@
+{
+  "categoryFixes": {},
+  "sourceStats": {
+    "invoice-extraction": {
+      "accepted": 1,
+      "edited": 1
+    },
+    "gst-record": {
+      "accepted": 0,
+      "edited": 1
+    }
+  },
+  "fieldStats": {
+    "accepted": 1,
+    "edited": 2,
+    "removed": 0
+  },
+  "log": [
+    {
+      "at": "2026-10-09T08:45:23.599Z",
+      "business": "Everest Steel"
+    }
+  ]
+}

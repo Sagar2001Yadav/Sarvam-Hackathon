@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seller Enrichment</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--ink:#1c2430;--mut:#667085;--red:#c00;--navy:#06245c;--line:#e3e6ea;--hi:#1a8f4c;--mid:#d98a00;--lo:#c62828;--hib:#e8f6ee;--midb:#fff6e0;--lob:#fdeaea}
+@media(prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b212a;--ink:#e8ecf1;--mut:#9aa4b2;--navy:#9db8f5;--line:#2c3441;--hib:#14281d;--midb:#2d2512;--lob:#2f1717}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px 60px}
+h1{margin:0 0 4px;font-size:26px}h1+p{margin:0 0 20px;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+h2{margin:0 0 10px;font-size:16px;color:var(--navy)}h3{margin:18px 0 8px;font-size:14px;color:var(--navy)}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
+input,textarea,select{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+input[type=checkbox]{width:auto}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}@media(max-width:640px){.grid{grid-template-columns:1fr}}
+button{background:var(--red);color:#fff;border:0;border-radius:6px;padding:8px 14px;font:inherit;cursor:pointer}
+button.alt{background:var(--navy);color:#fff}button.ghost{background:transparent;color:var(--mut);border:1px solid var(--line);padding:4px 9px;font-size:13px}
+button:disabled{opacity:.5}.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.item{border:1px solid var(--line);border-left-width:5px;border-radius:8px;padding:10px;margin-bottom:8px}
+.item.hi{border-left-color:var(--hi);background:var(--hib)}.item.mid{border-left-color:var(--mid);background:var(--midb)}.item.lo{border-left-color:var(--lo);background:var(--lob)}
+.item.gone{opacity:.45;text-decoration:line-through}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:1;min-width:90px}.row>.fix{flex:0 0 auto;min-width:0}
+.meta{font-size:12px;color:var(--mut);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.badge{font-size:12px;padding:2px 8px;border-radius:99px;color:#fff;white-space:nowrap;font-weight:600}
+.badge.hi{background:var(--hi)}.badge.mid{background:var(--mid)}.badge.lo{background:var(--lo)}
+.pill{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:1px 8px;font-size:12px}
+.review{color:var(--lo);font-weight:600}.alts{font-size:12px;margin-top:4px}.alts button{margin:2px 4px 0 0}
+.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{flex:1;min-width:140px;background:var(--bg);border-radius:8px;padding:8px 12px}.stat b{font-size:20px;display:block}
+pre{overflow:auto;background:var(--bg);padding:10px;border-radius:6px;font-size:12px;max-height:340px}
+#out{display:none}.mut{color:var(--mut);font-size:13px}#cands{margin-top:6px}
+.rec{background:var(--lo)}
+</style></head><body><main>
+<h1>Seller Enrichment</h1><p>Give us the minimum. We'll find the rest from public sources, and you confirm.</p>
+
+<div class="card"><h2>1. The call</h2>
+<p class="mut" style="margin:0 0 8px">Outbound call. IndiaMART already knows who it is calling (company and city from sign-up). The assistant confirms identity, asks consent, pulls the GST record and documents, confirms what it found, and asks only about what is missing or uncertain.</p>
+<div class="bar" style="margin:0 0 8px"><select id="leadsel" style="max-width:380px"></select><button id="assist">📞 Call this seller</button><span id="recst" class="mut"></span></div>
+<div id="dlg" style="display:none" class="item mid"><b>Call</b> <span class="mut" id="dstat"></span><div id="dlog" style="margin-top:6px;font-size:14px"></div><div class="mut" id="dcount"></div></div>
+<div class="mut" id="consentline">Consent: not yet asked</div>
+<div style="display:none"><input id="name"><input id="phone"><input id="site"><input id="g"><textarea id="raw"></textarea><input type="checkbox" id="consent"><button id="go">go</button><span id="st"></span></div>
+</div>
+
+<div id="out">
+<div class="card"><h2>2. Your pre-filled profile</h2>
+<div class="stats" id="stats"></div>
+<div class="mut" id="meta" style="margin-top:8px"></div>
+<h3>Business</h3><div id="biz"></div>
+<h3>Locations</h3><div id="locs"></div><button class="ghost" onclick="addLoc({})">+ add location</button>
+<h3>People</h3><div id="ppl"></div><button class="ghost" onclick="addPerson({})">+ add person</button>
+<h3>Categories (mapped to the IM taxonomy)</h3><div id="cats"></div>
+<div class="row" style="margin-top:6px"><input id="catq" placeholder="add a category: type a product, e.g. TMT bars"><button class="ghost fix" onclick="catSearch()">search</button></div><div id="cands"></div>
+<div class="bar"><button id="save">Confirm profile</button><span id="saved" class="mut"></span></div></div>
+<div class="card"><h2>Structured JSON (IM fields with confidence and sources)</h2><pre id="json"></pre></div>
+</div></main>
+<script>
+const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const lvl=c=>c>=.8?'hi':c>=.5?'mid':'lo';
+const badge=c=>`<span class="badge ${lvl(c)}">${Math.round(c*100)}%</span>`;
+let original=null,cardText='',callText='';
+const srcs=a=>`<span>source: ${(a||[]).map(s=>`<span class="pill">${esc(s)}</span>`).join(' ')||'—'}</span>`;
+const review=c=>c<.5?'<span class="review">needs your review</span>':'';
+const rm=()=>`<button class="ghost fix" onclick="this.closest('.item').classList.toggle('gone');refresh()">remove</button>`;
+const alts=(a,field)=>Object.keys(a||{}).length?`<div class="alts">Other values found: ${Object.entries(a).flatMap(([k,v])=>v.map(x=>`<button class="ghost" onclick="useAlt(this,'${k}','${esc(x.value).replace(/'/g,"\\'")}')">${k}: ${esc(x.value)} (${esc(x.source)})</button>`)).join('')}</div>`:'';
+function useAlt(b,k,v){const it=b.closest('.item');it.querySelector(`[data-f=${k}]`).value=v;refresh()}
+
+
+
+
+async function runEnrich(){
+  $('go').disabled=true;$('st').textContent='Finding and extracting…';const t0=Date.now();
+  try{
+    const r=await fetch('/api/enrich',{method:'POST',body:JSON.stringify({businessName:$('name').value,phone:$('phone').value,website:$('site').value,glid:lead?.glid,consented:!!window.consentGiven,googleLink:$('g').value,rawText:[callText,$('raw').value].filter(Boolean).join('\n'),rawLabel:'call-transcript'})});
+    const d=await r.json();if(d.error)throw new Error(d.error);
+    if(!d.profile){$('st').textContent=d.notes.join(' ');return}
+    original=d.profile;render(d,(Date.now()-t0)/1000);$('st').textContent=d.notes.join(' ');
+  }catch(e){$('st').textContent='Error: '+e.message}finally{$('go').disabled=false}
+}
+$('go').onclick=runEnrich;
+
+function render(d,secs){const p=d.profile;$('out').style.display='block';
+  const all=[p.businessName,p.gst,...p.locations,...p.people,...p.categories].filter(x=>x.confidence>0&&(x.value!==null||x.city||x.name||x.mcatId));
+  const hi=all.filter(x=>x.confidence>=.8).length,lo=all.filter(x=>x.confidence<.5).length;
+  const asked=all.filter(x=>x.confidence<.8).length;
+  $('stats').innerHTML=`<div class="stat"><b>${all.length}</b>fields auto-filled</div><div class="stat"><b>${hi}</b>high confidence (one tap)</div><div class="stat"><b>${asked}</b>need your eyes</div><div class="stat"><b>${secs.toFixed(1)}s</b>to build</div>`;
+  $('meta').innerHTML=`Read only: ${d.meta.sourcesUsed.map(s=>`<span class="pill">${esc(s)}</span>`).join(' ')} · ${esc(d.meta.consent)}`;
+  $('biz').innerHTML='';
+  const b=document.createElement('div');b.className='item '+lvl(p.businessName.confidence);b.id='bizitem';
+  b.innerHTML=`<div class="row"><input data-f="name" placeholder="business name" value="${esc(p.businessName.value)}"><input data-f="gst" placeholder="GSTIN" value="${esc(p.gst.value)}"></div><div class="meta">${badge(p.businessName.confidence)} ${srcs(p.businessName.sources)} ${p.gst.value?'GST: '+srcs(p.gst.sources)+' <i>'+esc(p.gst.note||'')+'</i>':''}${(p.businessName.alternatives||[]).map(a=>`<button class="ghost" onclick="document.querySelector('#bizitem [data-f=name]').value='${esc(a.value).replace(/'/g,"\\'")}';refresh()">use “${esc(a.value)}” (${esc(a.source)})</button>`).join('')}</div>`;
+  $('biz').append(b);
+  $('locs').innerHTML='';p.locations.forEach(addLoc);$('ppl').innerHTML='';p.people.forEach(addPerson);$('cats').innerHTML='';p.categories.forEach(addCat);refresh()}
+
+let uid=0;
+function addLoc(l){const d=document.createElement('div');d.dataset.id='loc'+(uid++);const c=l.confidence??1;d.className='item '+lvl(c);d.dataset.conf=c;d.dataset.src=JSON.stringify(l.sources||['seller']);
+  d.innerHTML=`<div class="row"><select data-f="type">${['registered','factory','branch','showroom','warehouse','office','other'].map(t=>`<option ${t==l.type?'selected':''}>${t}</option>`).join('')}</select><input data-f="street" placeholder="street / building" value="${esc(l.street)}" style="flex:2"><input data-f="locality" placeholder="locality" value="${esc(l.locality)}"><input data-f="city" placeholder="city" value="${esc(l.city)}"><input data-f="state" placeholder="state" value="${esc(l.state)}"><input data-f="pincode" placeholder="pincode" value="${esc(l.pincode)}" style="max-width:100px">${rm()}</div><div class="meta">${badge(c)} ${srcs(l.sources)} ${l.inferred?.length?'<span class="pill">'+l.inferred.join(', ')+' inferred from IM geo data</span>':''} ${review(c)}</div>${alts(l.alternatives)}`;
+  $('locs').append(d)}
+function addPerson(p){const d=document.createElement('div');d.dataset.id='ppl'+(uid++);const c=p.confidence??1;d.className='item '+lvl(c);d.dataset.conf=c;d.dataset.src=JSON.stringify(p.sources||['seller']);
+  d.innerHTML=`<div class="row"><input data-f="name" placeholder="name" value="${esc(p.name)}" style="flex:2"><select data-f="role">${['Owner','Director','Partner','Manager','Sales','Contact','Other'].map(t=>`<option ${t==p.role?'selected':''}>${t}</option>`).join('')}</select>${rm()}</div><div class="meta">${badge(c)} ${srcs(p.sources)} ${review(c)}</div>${alts(p.alternatives)}`;
+  $('ppl').append(d)}
+function addCat(c){const d=document.createElement('div');d.dataset.id='cat'+(uid++);d.className='item '+lvl(c.confidence);d.dataset.conf=c.confidence;d.dataset.cat=JSON.stringify(c);
+  d.innerHTML=`<div class="row"><div style="flex:3"><b>${esc(c.mcat)}</b> <span class="mut">#${c.mcatId}</span><div class="mut">${esc(c.group)} › ${esc(c.category)}</div></div><div class="mut" style="flex:2">from “${esc(c.sourceText)}”</div>${rm()}</div><div class="meta">${badge(c.confidence)} ${srcs(c.sources)} <span class="pill">${esc(c.via)}</span> ${review(c.confidence)}</div>`;
+  $('cats').append(d)}
+async function catSearch(){const q=$('catq').value;if(!q)return;const r=await fetch('/api/category-search?q='+encodeURIComponent(q));const d=await r.json();
+  $('cands').innerHTML=d.map(c=>`<button class="ghost" style="display:block;margin:3px 0;text-align:left" onclick='pickCat(${JSON.stringify({sourceText:q,mcatId:c.id,mcat:c.name,parent:c.parent,category:c.category,group:c.group,confidence:1,via:"seller-added",sources:["seller"]}).replace(/'/g,"&#39;")})'>${esc(c.name)} <span class="mut">— ${esc(c.category)}</span></button>`).join('')}
+function pickCat(c){addCat(c);$('cands').innerHTML='';$('catq').value='';refresh()}
+
+const val=(it,f)=>it.querySelector(`[data-f=${f}]`)?.value??'';
+function collect(){const live=sel=>[...document.querySelectorAll(sel)].filter(e=>!e.classList.contains('gone'));
+  return{businessName:{value:val($('bizitem'),'name')},gst:{value:val($('bizitem'),'gst')||null},
+   locations:live('#locs .item').map(e=>({type:val(e,'type'),street:val(e,'street'),locality:val(e,'locality'),city:val(e,'city'),state:val(e,'state'),pincode:val(e,'pincode'),confidence:+e.dataset.conf,sources:JSON.parse(e.dataset.src)})),
+   people:live('#ppl .item').map(e=>({name:val(e,'name'),role:val(e,'role'),confidence:+e.dataset.conf,sources:JSON.parse(e.dataset.src)})),
+   categories:live('#cats .item').map(e=>JSON.parse(e.dataset.cat))}}
+const refresh=()=>{$('json').textContent=JSON.stringify(collect(),null,2)};
+document.addEventListener('input',e=>{if($('out').contains(e.target))refresh()});
+$('save').onclick=async()=>{refresh();
+  const r=await fetch('/api/feedback',{method:'POST',body:JSON.stringify({original,corrected:collect()})});const fb=await r.json();
+  $('saved').textContent=`Saved. ${fb.fieldStats.accepted} fields accepted, ${fb.fieldStats.edited} edited so far; ${Object.keys(fb.categoryFixes).length} category corrections learned.`};
+
+// ================= Voice assistant: the AI speaks (Sarvam Bulbul) and listens (Sarvam Saaras) =================
+let leads=[],lead=null;fetch('/api/leads').then(r=>r.json()).then(ls=>{leads=ls;$('leadsel').innerHTML=ls.map(l=>`<option value="${l.glid}">${esc(l.company)} — ${esc(l.city)}</option>`).join('')});
+const FIXED=['Dhanyavaad. Ek minute, main jaankari dekh raha hoon.','Theek hai, main kuch nahi dekhunga. Main bas aapse kuch sawaal poochunga.','Maaf kijiye, galat number lag gaya. Dhanyavaad.','Aapka business kahan hai? Shehar aur area bataiye.','Aap kya banate ya bechte hain?','Aapne IndiaMART par apna business jodna shuru kiya hai. Form bharne ke bajaye main aapka profile khud taiyaar karunga. Iske liye kya main aapka GST record aur aapke diye hue documents ki jaankari dekh sakta hoon? Aap koi bhi cheez hata sakte hain.'];
+let asking=0;const dlog=(who,t)=>{$('dlog').insertAdjacentHTML('beforeend',`<div><b>${who}:</b> ${esc(t)}</div>`);$('dlog').scrollTop=1e6};
+const play=b64=>new Promise(res=>{const a=new Audio('data:audio/wav;base64,'+b64);a.onended=res;a.onerror=res;a.play().catch(res)});
+const ttsCache=new Map();
+const tts=t=>{if(!ttsCache.has(t))ttsCache.set(t,fetch('/api/tts',{method:'POST',body:JSON.stringify({text:t})}).then(r=>r.json()).then(d=>d.audio).catch(()=>null));return ttsCache.get(t)};
+async function say(t){dlog('AI',t);$('dstat').textContent='speaking…';try{const a=await tts(t);if(a)await play(a)}catch{}$('dstat').textContent=''}
+async function ask(t){asking++;$('dcount').textContent=`Questions asked: ${asking} (a form would need ~30 fields)`;await say(t);return listen()}
+// record until the seller stops talking (simple silence detection)
+async function listen(maxMs=12000){
+  $('dstat').textContent='🎤 listening…';
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  const mr=new MediaRecorder(stream),parts=[];mr.ondataavailable=e=>parts.push(e.data);
+  const ac=new AudioContext(),an=ac.createAnalyser();ac.createMediaStreamSource(stream).connect(an);const buf=new Uint8Array(an.fftSize);
+  mr.start();let spoke=false,quiet=0,t=0;
+  await new Promise(done=>{const iv=setInterval(()=>{an.getByteTimeDomainData(buf);let m=0;for(const v of buf)m=Math.max(m,Math.abs(v-128));t+=100;
+    if(m>12){spoke=true;quiet=0}else if(spoke)quiet+=100;
+    if((spoke&&quiet>800)||t>maxMs||(!spoke&&t>4000)){clearInterval(iv);done()}},100)});
+  const stopped=new Promise(r=>mr.onstop=r);mr.stop();await stopped;stream.getTracks().forEach(x=>x.stop());ac.close();
+  $('dstat').textContent='understanding…';
+  if(!spoke)return{transcript:'',seed:{}};
+  const r=await fetch('/api/voice',{method:'POST',body:new Blob(parts,{type:mr.mimeType})});const d=await r.json();
+  dlog('Seller',d.transcript||'(no speech)');if(d.transcript)callText+=(callText?'\n':'')+d.transcript;$('dstat').textContent='';return d}
+async function addByVoice(text){const r=await fetch('/api/category-map',{method:'POST',body:JSON.stringify({text})});const c=await r.json();
+  if(!c)return false;c.sources=['seller-voice'];c.via='added by seller (voice)';addCat(c);refresh();return c}
+const YES=/^(haan|han|haa|ha|ji|haanji|hanji|yes|yeah|yep|sahi|sahi hai|theek|theek hai|thik hai|ok|okay|bilkul|हाँ|हां|जी|जी हाँ|जी हां|ठीक|ठीक है|सही|सही है|बिल्कुल)( (haan|ji|hai|sahi|theek|ठीक|है|हाँ|जी))?$/i;
+const NO=/^(nahi|nahin|nahi ji|no|nope|galat|galat hai|नहीं|नही|गलत|गलत है)$/i;
+async function interpret(question,its,u){const q=(u||'').toLowerCase().replace(/[.,!?।]/g,'').trim();if(YES.test(q))return{intent:'yes'};if(NO.test(q))return{intent:'no'};const r=await fetch('/api/interpret',{method:'POST',body:JSON.stringify({question,items:its,utterance:u})});return r.json()}
+
+const label=el=>{const v=f=>el.querySelector(`[data-f=${f}]`)?.value||'';
+  if(el.dataset.id.startsWith('loc'))return `${v('type')} location: ${[v('street'),v('locality'),v('city'),v('state'),v('pincode')].filter(Boolean).join(', ')}`;
+  if(el.dataset.id.startsWith('ppl'))return `${v('name')}, ${v('role')}`;
+  const c=JSON.parse(el.dataset.cat);return `category ${c.mcat}`};
+let ackN=0;const pick=(...o)=>o[(ackN++)%o.length];
+const FN={role:'role',street:'address',locality:'area',city:'shehar',state:'state',pincode:'pincode',name:'naam',type:'type'};
+const who=el=>el.dataset.id.startsWith('ppl')?(el.querySelector('[data-f=name]').value||'is vyakti'):el.dataset.id.startsWith('loc')?`${el.querySelector('[data-f=type]').value} ka address`:'is category';
+function applyReply(rep){ // apply a spoken correction to the on-screen profile; returns what to say back
+  const el=rep.target&&document.querySelector(`[data-id=${rep.target}]`);if(!el)return '';
+  const before=label(el);
+  if(rep.intent==='remove'){el.classList.add('gone');refresh();return pick(`Theek hai, ${before} profile se hata diya.`,`Samajh gaya, ${before} hata diya hai.`,`Ji, ${before} nikal diya.`)}
+  if(rep.intent==='edit'&&rep.field&&rep.value){const f=el.querySelector(`[data-f=${rep.field}]`);if(!f)return '';
+    const name=who(el);f.value=rep.value;el.dataset.conf=1;el.className=el.className.replace(/\b(hi|mid|lo)\b/,'hi');refresh();
+    return pick(`Samajh gaya, ${name} ka ${FN[rep.field]||rep.field} ab ${rep.value} kar diya.`,`Achha, ${FN[rep.field]||rep.field} ${rep.value} likh liya.`,`Theek hai, ${name} mein ${FN[rep.field]||rep.field} ${rep.value} update ho gaya.`)}
+  return ''}
+const addMsg=c=>c?pick(`Achha, ${c.mcat} bhi jod diya.`,`Theek hai, ${c.mcat} aapki categories mein add kar di.`,`Samajh gaya, ${c.mcat} bhi list mein daal diya.`):'Ye category mujhe list mein nahi mili, aap baad mein jod sakte hain.';
+const MORE=['Aur kuch badalna hai? Sab theek hai to haan bolein.','Koi aur cheez galat lag rahi hai?','Aur kuch sudharna hai, ya ab sab sahi hai?'];
+const NOTUNDERSTOOD='Maaf kijiye, mujhe theek se samajh nahi aaya. Kya aap dobara bata sakte hain?';
+const liveItems=()=>[...document.querySelectorAll('#locs .item,#ppl .item,#cats .item')].filter(e=>!e.classList.contains('gone'));
+const yes=r=>r.intent==='yes';
+const asItems=els=>els.map(e=>({id:e.dataset.id,label:label(e)}));
+
+$('assist').onclick=async()=>{
+  $('assist').disabled=true;$('dlg').style.display='block';$('dlog').innerHTML='';asking=0;callText='';
+  try{
+    // 1. we know who we are calling: confirm identity, do not ask for the business name
+    lead=leads.find(l=>l.glid===$('leadsel').value);$('name').value=lead.company;window.consentGiven=false;
+    FIXED.forEach(tts);
+    let u=await ask(`Namaste! Main IndiaMART se bol raha hoon. Kya main ${lead.company}, ${lead.city} se baat kar raha hoon?`);
+    let who=await interpret('Is this the right business?',[],u.transcript);
+    if(who.intent==='no'){await say(FIXED[2]);return}
+    // 2. why we call + consent
+    u=await ask(FIXED[5]);
+    const c=await interpret('May I look at your GST record and the documents you provided to pre-fill your profile?',[],u.transcript);
+    window.consentGiven=c.intent==='yes'||c.intent==='add'||c.intent==='edit';
+    window.consentLog={at:new Date().toISOString(),said:u.transcript,granted:window.consentGiven};
+    $('consentline').textContent=(window.consentGiven?'Consent GIVEN':'Consent NOT given')+' by voice at '+new Date().toLocaleTimeString()+': "'+u.transcript+'"';
+    if(!window.consentGiven){await say(FIXED[1]);await runEnrich()}
+    else{const talking=say(FIXED[0]);await runEnrich();await talking} // look things up while the bot is speaking
+    // 3. ask ONLY for what is missing (up to two rounds), then re-run with the spoken answers as a source
+    for(let pass=0;pass<2;pass++){
+      const prof=original||{locations:[],categories:[]};const missing=[];
+      if(!prof.locations?.length)missing.push(FIXED[3]);
+      if(!prof.categories?.length)missing.push(FIXED[4]);
+      if(!missing.length)break;
+      await ask(missing.join(' Aur '));await runEnrich();
+    }
+    if(!original){await say("Mujhe abhi koi jaankari nahi mili. Hum baad mein dobara baat karenge. Dhanyavaad.");return}
+
+    // 2. high-confidence fields: confirm in ONE batch
+    const all=liveItems(),high=all.filter(e=>+e.dataset.conf>=.8),low=all.filter(e=>+e.dataset.conf<.8);
+    const pick=['loc','ppl','cat'].map(k=>high.find(e=>e.dataset.id.startsWith(k))).filter(Boolean);
+    if(pick.length){
+      const text=`Mujhe ye mila: ${pick.map(label).join('. ')}. Kya ye sahi hai?`;
+      u=await ask(text);let r=await interpret(text,asItems(high),u.transcript);let rounds=0;
+      if(r.intent==='add'&&r.value){const c=await addByVoice(r.value);await say(addMsg(c));r={intent:'yes'}}
+      while(!yes(r)&&rounds++<2){
+        if(r.intent==='add'&&r.value){const c=await addByVoice(r.value);await say(addMsg(c));}
+        else if(r.intent==='edit'||r.intent==='remove'){await say(applyReply(r)||NOTUNDERSTOOD)}
+        u=await ask(MORE[rounds%MORE.length]);
+        r=await interpret("Is anything else wrong?",asItems(high),u.transcript);
+        if(r.intent==='no'||r.intent==='yes'){await say('Theek hai, sab confirm ho gaya.');break}
+        if(r.intent==='unclear'){await say('Theek hai, baaki aap screen par dekh lijiye.');break}
+      }
+    }
+    // 3. only low-confidence / conflicting fields are asked one by one
+    for(const e of low.slice(0,4)){
+      if(e.classList.contains('gone'))continue;
+      const alts=[...e.querySelectorAll('.alts button')].map(b=>b.textContent).slice(0,2).join(' ya ');
+      const q=`Mujhe pakka nahi hai: ${label(e)}. ${alts?'Dusre options: '+alts+'. ':''}Kya ye sahi hai?`;
+      u=await ask(q);const r=await interpret(q,asItems([e]),u.transcript);
+      if(yes(r)){e.dataset.conf=1;e.className=e.className.replace(/\b(mid|lo)\b/,'hi');await say(pick('Theek hai, ise pakka kar liya.','Achha, ye sahi hai, aage badhte hain.','Shukriya, ye confirm ho gaya.'))}
+      else if(r.intent==='no'||r.intent==='remove'){e.classList.add('gone');await say(pick(`Theek hai, ${label(e)} hata diya.`,`Samajh gaya, ${label(e)} profile se nikal diya.`))}
+      else if(r.intent==='edit'){r.target=e.dataset.id;const m=applyReply(r);await say(m||NOTUNDERSTOOD)}
+      refresh()}
+    u=await ask(`Profile taiyaar hai. Maine sirf ${asking} sawaal puche. Kya main ise save kar doon?`);
+    const fin=await interpret('Shall I save the profile?',[],u.transcript);
+    if(fin.intent==='yes'){await say('Profile save ho gaya. Dhanyavaad!');await $('save').onclick()}else await say('Theek hai, maine save nahi kiya. Dhanyavaad.');
+  }catch(e){dlog('error',e.message)}finally{$('assist').disabled=false;$('dstat').textContent=''}
+};
+</script></body></html>

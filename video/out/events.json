@@ -1,0 +1,199 @@
+{
+ "events": [
+  {
+   "type": "narr",
+   "t": 4437,
+   "text": "This is IndiaMART's seller verification voice agent. It phones a seller, confirms the details we hold, field by field, and records every answer with evidence, a confidence score and an audit trail.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip001.wav"
+  },
+  {
+   "type": "narr",
+   "t": 20633,
+   "text": "Here is the stored record for Raghav Enterprises, loaded from a CSV and treated as unverified. The seller is played by a second voice, heard through real speech recognition.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip002.wav"
+  },
+  {
+   "type": "ring",
+   "t": 31703
+  },
+  {
+   "type": "seller",
+   "t": 36161,
+   "text": "Hello?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip003.wav"
+  },
+  {
+   "type": "bot",
+   "t": 37487,
+   "text": "Namaste ji! Main Priya bol rahi hoon, IndiaMART se. Kya main Raghav ji se baat kar rahi hoon?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip004.wav"
+  },
+  {
+   "type": "seller",
+   "t": 45570,
+   "text": "Haan ji, boliye.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip005.wav"
+  },
+  {
+   "type": "bot",
+   "t": 47250,
+   "text": "Ji Raghav ji, aapki Raghav Enterprises ki profile ke baare mein ek chhota sa call hai, bas do minute lagenge. Ye call record ho rahi hai taaki aapki jaankari sahi se update ho sake. Kya abhi baat karna theek rahega?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip006.wav"
+  },
+  {
+   "type": "seller",
+   "t": 60569,
+   "text": "Nahi.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip007.wav"
+  },
+  {
+   "type": "bot",
+   "t": 61719,
+   "text": "Koi baat nahi ji. Bas kuch cheezein confirm karni hain, aapko koi form nahi bharna padega. Kya abhi do minute de sakte hain?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip008.wav"
+  },
+  {
+   "type": "seller",
+   "t": 70467,
+   "text": "Haan theek hai, bolo.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip009.wav"
+  },
+  {
+   "type": "bot",
+   "t": 73479,
+   "text": "Pehle company ka naam. Hamare record mein Raghav Enterprises likha hai, ye sahi hai?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip010.wav"
+  },
+  {
+   "type": "seller",
+   "t": 80026,
+   "text": "Haan, bilkul sahi hai.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip011.wav"
+  },
+  {
+   "type": "bot",
+   "t": 82295,
+   "text": "Theek hai, company ka naam confirm ho gaya.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip012.wav"
+  },
+  {
+   "type": "bot",
+   "t": 85652,
+   "text": "Aur address: ABC, Noida, Uttar Pradesh. Ye sahi hai?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip013.wav"
+  },
+  {
+   "type": "cut",
+   "t": 88361
+  },
+  {
+   "type": "seller",
+   "t": 88362,
+   "text": "Nahi nahi, ab hamara address Sector 62 Noida hai.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip014.wav"
+  },
+  {
+   "type": "bot",
+   "t": 93214,
+   "text": "Theek hai, address badal kar Sector 62, Noida, Uttar Pradesh likha hai, verify hone ke baad update hoga.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip015.wav"
+  },
+  {
+   "type": "bot",
+   "t": 99572,
+   "text": "Ek aur cheez ji, aapki company ki website kya hai? Agar nahi hai to koi baat nahi.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip016.wav"
+  },
+  {
+   "type": "seller",
+   "t": 106263,
+   "text": "Pehle ye bataiye, aap kaun bol rahi hain aur ye sab kyun chahiye?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip017.wav"
+  },
+  {
+   "type": "bot",
+   "t": 119075,
+   "text": "Ji, main IndiaMART ki taraf se bol rahi hoon. Hum aapki business profile verify kar rahi hoon taaki buyers ko sahi details mil sakein. Isme kuch bhi becha ya pay nahi kiya jata. Main aapse koi OTP ya bank detail nahi maangungi. Toh, Ek aur cheez ji, aapki company ki website kya hai? Agar nahi hai to koi baat nahi.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip018.wav"
+  },
+  {
+   "type": "seller",
+   "t": 140143,
+   "text": "Website raghav enterprises dot in hai.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip019.wav"
+  },
+  {
+   "type": "bot",
+   "t": 146392,
+   "text": "Achha, website raghaventerprises.in note kar liya.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip020.wav"
+  },
+  {
+   "type": "bot",
+   "t": 150695,
+   "text": "Aap kya banate ya bechte hain?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip021.wav"
+  },
+  {
+   "type": "seller",
+   "t": 153965,
+   "text": "Hum LED lights aur panel lights banate hain.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip022.wav"
+  },
+  {
+   "type": "bot",
+   "t": 158398,
+   "text": "Theek hai, LED Lights, Panel Light jod diya hai.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip023.wav"
+  },
+  {
+   "type": "bot",
+   "t": 162814,
+   "text": "Bahut shukriya Raghav ji. Maine 2 cheezein confirm ki aur 3 nayi ya badli hui jaankari note ki hai. Hamari team ek baar check karke profile update kar degi. Kya aapka koi sawaal hai?",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip024.wav"
+  },
+  {
+   "type": "seller",
+   "t": 176646,
+   "text": "Nahi, bas.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip025.wav"
+  },
+  {
+   "type": "bot",
+   "t": 178738,
+   "text": "Theek hai ji, aapka din shubh ho. Namaste!",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip026.wav"
+  },
+  {
+   "type": "seller",
+   "t": 182873,
+   "text": "Namaste.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip027.wav"
+  },
+  {
+   "type": "bot",
+   "t": 184299,
+   "text": "Ji, dhanyavaad. Namaste!",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip028.wav"
+  },
+  {
+   "type": "narr",
+   "t": 190160,
+   "text": "Every field was classified, scored and stored. The corrected address and the new product list are flagged for human review.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip029.wav"
+  },
+  {
+   "type": "narr",
+   "t": 201993,
+   "text": "The reviewer sees the previous value, the proposed value, the seller's own words and why it was flagged. Nothing is overwritten until approved. Here, the new address is approved.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip030.wav"
+  },
+  {
+   "type": "narr",
+   "t": 225215,
+   "text": "Twenty eight conversation scenarios and thirteen of thirteen field classifications passed. On one hundred dataset sellers, about ninety three percent of fields were filled automatically. Built on Sarvam voice, speech and language models, with the agent also created through the Sarvam MCP.",
+   "file": "C:\\Users\\Imart\\scm-imrepo\\sarvam-hackathon\\video\\out\\clip031.wav"
+  }
+ ],
+ "total": 246411
+}

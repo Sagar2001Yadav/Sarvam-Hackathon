@@ -1,0 +1,9 @@
+{
+  "name": "sarvam-hackathon",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "sarvamai": "^1.1.11"
+  }
+}

@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seller Verification Call</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--ink:#1c2430;--mut:#667085;--red:#c00;--navy:#06245c;--line:#e3e6ea;--hi:#1a8f4c;--mid:#d98a00;--lo:#c62828;--hib:#e8f6ee;--midb:#fff6e0;--lob:#fdeaea}
+@media(prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b212a;--ink:#e8ecf1;--mut:#9aa4b2;--navy:#9db8f5;--line:#2c3441;--hib:#14281d;--midb:#2d2512;--lob:#2f1717}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+h1{margin:0;font-size:24px}a{color:var(--navy)}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+h2{margin:0 0 10px;font-size:16px;color:var(--navy)}.mut{color:var(--mut);font-size:13px}
+button,select{font:inherit;border-radius:6px}button{background:var(--red);color:#fff;border:0;padding:8px 14px;cursor:pointer}button.ghost{background:transparent;color:var(--mut);border:1px solid var(--line);padding:5px 10px;font-size:13px}button:disabled{opacity:.5}
+select{padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);max-width:420px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:860px){.cols{grid-template-columns:1fr}}
+#dlog{max-height:300px;overflow:auto;font-size:14px}#dlog div{margin:3px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:600}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;color:#fff;white-space:nowrap}
+.confirmed{background:var(--hi)}.corrected{background:var(--mid)}.newly_provided{background:#2b6cb0}.unconfirmed,.ambiguous{background:var(--lo)}.not_answered{background:#888}
+.aud-pending{color:var(--lo);font-weight:600}.aud-ok{color:var(--hi)}
+.old{text-decoration:line-through;color:var(--mut)}
+</style></head><body><main>
+<header><h1>Seller Verification Call</h1><span><a href="/audit">Manual audit</a> · <a href="/enrich">Enrichment prototype</a> · <a href="#" id="reset">Reset demo data</a></span></header>
+
+<div class="card"><h2>1. Outbound call</h2>
+<p class="mut" style="margin:0 0 8px">Reference data comes from <code>data/seller_reference.csv</code> (treated as unverified). The bot confirms it field by field; every outcome is stored with its evidence, scores and audit status.</p>
+<div class="bar"><select id="sel"></select><button id="call">📞 Call this seller</button><label class="mut"><input type="checkbox" id="barge" checked> allow interruptions (use headphones)</label><label class="mut">🔊 volume <input type="range" id="vol" min="1" max="5" step="0.25" value="2.5" style="width:110px;vertical-align:middle"></label><span id="dstat" class="mut"></span></div>
+<div id="ref" class="mut" style="margin-top:8px"></div></div>
+
+<div class="cols">
+<div class="card"><h2>Call</h2><div id="dlog"></div><div class="mut" id="consent" style="margin-top:8px">Consent: not yet asked</div></div>
+<div class="card"><h2>Estimated confidence (not calibrated)</h2>
+<div class="mut"><b>Extraction confidence</b>: how reliably we captured what the seller said (clarity, speech quality, whether the value appears in what was said, contradictions).<br><b>Value reliability</b>: how likely the stored value is correct (source prior, seller confirmation, validation, corroboration).<br>Anything ambiguous, contradictory, failing validation, low-confidence, or a correction goes to <a href="/audit">manual audit</a>; nothing is overwritten until approved.</div></div>
+</div>
+
+<div class="card"><h2>2. Field-level outcomes (live)</h2>
+<table><thead><tr><th>Field</th><th>Stored before (source)</th><th>Seller said</th><th>Result</th><th>Value</th><th>Extraction / Reliability</th><th>Audit</th></tr></thead><tbody id="rows"></tbody></table></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const api=(p,b)=>fetch(p,b?{method:'POST',body:JSON.stringify(b)}:{}).then(r=>r.json());
+const FIELD_LABEL={person_name:'Contact person',company_name:'Company name',address:'Address',website:'Website',products:'Products'};
+const FIELD_HI={person_name:'naam',company_name:'company ka naam',address:'address',website:'website',products:'products'};
+let sellers=[],seller=null,callId=null,transcript=[],asking=0;
+
+api('/api/reference').then(ls=>{sellers=ls;$('sel').innerHTML=ls.slice().sort((a,b)=>(b.origin==='csv:demo')-(a.origin==='csv:demo')).map(s=>`<option value="${s.seller_id}">${esc(s.company)} — ${esc(s.address||'')} (${s.seller_id})${s.pending?` · ${s.pending} pending`:''}</option>`).join('')});
+$('reset').onclick=async e=>{e.preventDefault();if(confirm('Reset all calls and audit history to the CSV reference data?')){await api('/api/reset',{});location.reload()}};
+
+// ------------ voice: bot speaks (Sarvam Bulbul) and listens (Sarvam Saaras, romanised output)
+const log=(who,t)=>{$('dlog').insertAdjacentHTML('beforeend',`<div><b>${who}:</b> ${esc(t)}</div>`);$('dlog').scrollTop=1e6;transcript.push({who,t,at:new Date().toISOString()})};
+const play=null; // (playback now lives in say(), so it can be interrupted)
+const cache=new Map();const tts=t=>{if(!cache.has(t))cache.set(t,api('/api/tts',{text:t}).then(d=>d.audio).catch(()=>null));return cache.get(t)};
+
+// ------------ audio engine: the microphone stays open for the whole call so the seller can interrupt the bot
+const eng={sr:16000,ring:[],cur:[],inSpeech:false,hot:0,quiet:0,speechMs:0,floor:0.005,lvl:0,mode:'idle',pending:null,waiter:null,onStart:null,barged:false,ctx:null,stream:null,proc:null};
+function toWav16k(chunks,sr){
+  let n=0;for(const c of chunks)n+=c.length;const all=new Float32Array(n);let o=0;for(const c of chunks){all.set(c,o);o+=c.length}
+  const ratio=sr/16000,m=Math.floor(n/ratio),pcm=new Int16Array(m);
+  for(let i=0;i<m;i++){const a=Math.floor(i*ratio),b=Math.min(n,Math.floor((i+1)*ratio));let s=0;for(let j=a;j<b;j++)s+=all[j];const v=s/Math.max(1,b-a);pcm[i]=Math.max(-1,Math.min(1,v))*0x7fff}
+  const buf=new ArrayBuffer(44+pcm.length*2),dv=new DataView(buf),W=(p,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(p+i,s.charCodeAt(i))};
+  W(0,'RIFF');dv.setUint32(4,36+pcm.length*2,true);W(8,'WAVE');W(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,16000,true);dv.setUint32(28,32000,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);W(36,'data');dv.setUint32(40,pcm.length*2,true);
+  new Int16Array(buf,44).set(pcm);return new Blob([buf],{type:'audio/wav'})}
+function onFrame(x){
+  let s=0;for(let i=0;i<x.length;i++)s+=x[i]*x[i];const rms=Math.sqrt(s/x.length);eng.lvl=rms;
+  const d=new Float32Array(x),ms=x.length/eng.sr*1000;
+  // while the bot is talking the bar is higher, so its own voice leaking into the mic does not count as an interruption
+  const thr=eng.mode==='bot'?Math.max(0.05,eng.floor*5):Math.max(0.012,eng.floor*3);
+  if(!eng.inSpeech){
+    eng.ring.push(d);if(eng.ring.length>12)eng.ring.shift(); // ~0.5 s pre-roll so the first words are not cut off
+    if(eng.mode==='listen')eng.floor=0.97*eng.floor+0.03*Math.min(rms,0.03);
+    eng.hot=rms>thr?eng.hot+1:0;
+    const need=Math.ceil((eng.mode==='bot'?260:110)/ms);
+    if(eng.mode!=='idle'&&eng.hot>=need){eng.inSpeech=true;eng.cur=[...eng.ring];eng.ring=[];eng.quiet=0;eng.speechMs=0;eng.barged=eng.mode==='bot';if(eng.onStart)eng.onStart()}
+  }else{
+    eng.cur.push(d);eng.speechMs+=ms;
+    if(rms>thr*0.7)eng.quiet=0;else eng.quiet+=ms;
+    if(eng.quiet>=950||eng.speechMs>15000)endUtterance();
+  }
+}
+function endUtterance(){
+  const dur=eng.speechMs-eng.quiet+130; // voiced time after the trigger (+ the ~130 ms that triggered it); pre-roll is not counted
+  eng.inSpeech=false;eng.hot=0;
+  if(dur<300){eng.cur=[];return} // a click or cough, not speech
+  const u={wav:toWav16k(eng.cur,eng.sr),barged:eng.barged,ms:Math.round(dur)};eng.cur=[];
+  if(eng.waiter){const w=eng.waiter;eng.waiter=null;w(u)}else eng.pending=u}
+$('vol').oninput=()=>{if(eng.gain)eng.gain.gain.value=+$('vol').value}; // volume slider works during the call
+async function openMic(){ // must run inside the click handler so the browser allows audio
+  eng.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  eng.ctx=new (window.AudioContext||window.webkitAudioContext)();await eng.ctx.resume();eng.sr=eng.ctx.sampleRate;
+  const src=eng.ctx.createMediaStreamSource(eng.stream);eng.proc=eng.ctx.createScriptProcessor(2048,1,1);
+  eng.proc.onaudioprocess=e=>onFrame(e.inputBuffer.getChannelData(0));src.connect(eng.proc);eng.proc.connect(eng.ctx.destination);
+  eng.gain=eng.ctx.createGain();eng.gain.gain.value=+$('vol').value;eng.comp=eng.ctx.createDynamicsCompressor();
+  Object.assign(eng.comp.threshold,{value:-14});Object.assign(eng.comp.knee,{value:6});Object.assign(eng.comp.ratio,{value:10});
+  eng.gain.connect(eng.comp);eng.comp.connect(eng.ctx.destination);
+  Object.assign(eng,{ring:[],cur:[],inSpeech:false,hot:0,pending:null,waiter:null,mode:'listen'})}
+function closeMic(){eng.mode='idle';try{eng.proc&&eng.proc.disconnect();eng.stream&&eng.stream.getTracks().forEach(t=>t.stop());eng.ctx&&eng.ctx.close()}catch{}eng.proc=eng.stream=eng.ctx=null}
+
+// the bot speaks; if the seller starts talking, it stops at once and what they say is kept for the next listen()
+async function say(t){
+  log('Bot',t);$('dstat').textContent='speaking…';
+  let a=await tts(t);if(!a){cache.delete(t);a=await tts(t)}
+  if(!a){log('error','voice generation failed for this line (network); continuing');$('dstat').textContent='';return}
+  let stop,audio;const ended=new Promise(r=>{stop=r});
+  try{
+    const bin=atob(a),u8=Uint8Array.from(bin,c=>c.charCodeAt(0));
+    const buf=await eng.ctx.decodeAudioData(u8.buffer);
+    const node=eng.ctx.createBufferSource();node.buffer=buf;node.connect(eng.gain);node.onended=stop;node.start();
+    audio={pause:()=>{try{node.stop()}catch{}},play:async()=>{}};
+  }catch{ // fall back to a plain audio element
+    const el=new Audio('data:audio/wav;base64,'+a);el.volume=1;el.onended=stop;el.onerror=stop;audio={pause:()=>el.pause(),play:()=>el.play()};}
+  eng.mode=$('barge').checked?'bot':'idle';
+  eng.onStart=()=>{if(eng.mode==='bot'){audio.pause();log('Note','(seller interrupted — listening)');eng.mode='listen';stop()}};
+  try{await audio.play()}catch{stop()}
+  await ended;eng.onStart=null;if(eng.mode!=='idle'||!eng.inSpeech)eng.mode='listen';eng.hot=0;$('dstat').textContent=''}
+
+async function listen(maxMs=12000,patience=4500){
+  eng.mode='listen';
+  let u=eng.pending;eng.pending=null;
+  if(!u){
+    u=await new Promise(resolve=>{
+      eng.waiter=resolve;const t0=performance.now();
+      const iv=setInterval(()=>{
+        $('dstat').textContent=`🎤 listening… level ${Math.round(eng.lvl*300)}${eng.inSpeech?' (hearing you)':''}`;
+        if(!eng.waiter){clearInterval(iv);return}
+        if(!eng.inSpeech&&performance.now()-t0>patience){clearInterval(iv);eng.waiter=null;resolve(null)}},100)})}
+  if(!u){$('dstat').textContent='';return{transcript:'',language_probability:null}}
+  $('dstat').textContent='understanding…';
+  const r=await fetch('/api/voice?mode=translit&seed=0',{method:'POST',body:u.wav});const d=await r.json();
+  if(d.error){log('error','speech recognition: '+d.error);$('dstat').textContent='';return{transcript:'',language_probability:null}}
+  log('Seller',d.transcript||'(no speech)');$('dstat').textContent='';return{...d,barged:u.barged}}
+
+// if the seller is already speaking (interrupted an acknowledgement), do not talk over them: use what they said as the reply
+async function ask(t,patience){asking++;if(t&&!eng.pending&&!eng.inSpeech){await new Promise(r=>setTimeout(r,350));await say(t)}return listen(12000,patience)}
+
+const YES=/^((haan|han|haa|ha|ji|haanji|hanji|yes|yeah|yep|ok|okay|bilkul|sahi|theek|thik|chalo|boliye|bolo|bataiye|batao|kariye|karo|kar do|kar lo|kar sakte hain|hai|hain)\s*)+$/i;
+const NO=/^(nahi|nahin|nahi ji|no|nope|galat|galat hai|nahi hai)$/i;
+const norm=u=>(u||'').toLowerCase().replace(/[.,!?।]/g,'').replace(/\b(\w+)( \1\b)+/g,'$1').trim();
+
+// ------------ questions (reference values are known before the call, so the audio can be generated ahead of time)
+const val=f=>seller.fields.find(x=>x.field===f)?.value||'';
+const Q={
+  company_name:()=>`Pehle company ka naam. Hamare record mein ${val('company_name')} likha hai, ye sahi hai?`,
+  address:()=>`Aur address: ${val('address')}. Ye sahi hai?`,
+  website:()=>val('website')?`Website ${val('website')} hai, ye sahi hai?`:'Ek aur cheez ji, aapki company ki website kya hai? Agar nahi hai to koi baat nahi.',
+};
+const CLARIFY={company_name:'Company ka naam ek baar phir bata sakte hain?',address:'Maaf kijiye, address ek baar phir bata sakte hain?',website:'Website ka naam ek baar phir bata dijiye.',products:'Aap kya banate ya bechte hain, ek baar phir bata dijiye.',person_name:'Aap kaun bol rahe hain, ek baar phir bata dijiye.'};
+let ackN=0;const pick=(...o)=>o[(ackN++)%o.length];
+function ack(e,r){
+  const v=e.new_value,f=FIELD_HI[e.field],pend=e.audit_status==='pending';
+  switch(e.classification){
+    case 'confirmed':return e.new_value===''&&e.field==='website'?'Theek hai, website nahi hai, ye note kar liya.':pick(`Theek hai, ${f} confirm ho gaya.`,`Achha, ${f} sahi hai.`,`Shukriya, ${f} confirm ho gaya.`);
+    case 'corrected':return pend?pick(`Samajh gaya, ${f} ${v} note kar liya. Hamari team ek baar verify karegi.`,`Theek hai, ${f} badal kar ${v} likha hai, verify hone ke baad update hoga.`):pick(`Samajh gaya, ${f} ${v} kar diya.`,`Theek hai, ${f} ${v} update ho gaya.`);
+    case 'newly_provided':return pick(`Achha, ${f} ${v} note kar liya.`,`Theek hai, ${v} jod diya hai.`);
+    case 'unconfirmed':return pick('Koi baat nahi, hum ise baad mein verify kar lenge.','Theek hai, isko hum baad mein check kar lenge.');
+    default:return 'Theek hai.';}
+}
+
+// ------------ tracker table
+const rows={};
+function row(f){if(!rows[f]){const tr=document.createElement('tr');tr.id='r-'+f;$('rows').append(tr);rows[f]=tr}return rows[f]}
+function paint(f,e){const tr=row(f);const stored=seller.fields.find(x=>x.field===f);
+  const audit=e?(e.audit_status==='pending'?`<span class="aud-pending">PENDING review</span><br><span class="mut">${esc((e.audit_reasons||[]).join('; '))}</span>`:`<span class="aud-ok">${e.audit_status.replace('_',' ')}</span>`):'';
+  tr.innerHTML=`<td><b>${FIELD_LABEL[f]}</b></td><td>${esc(e?e.previous_value||'(empty)':stored?.value||'(empty)')}<div class="mut">${esc(e?e.original_source:stored?.source||'')}</div></td>
+  <td class="mut">${e?esc(e.evidence||''):''}</td><td>${e?`<span class="pill ${e.classification}">${e.classification.replace('_',' ')}</span>`:'<span class="mut">pending…</span>'}</td>
+  <td>${e&&e.new_value!=null&&e.classification!=='confirmed'?(e.previous_value&&e.new_value!==e.previous_value?`<span class="old">${esc(e.previous_value)}</span><br>`:'')+'<b>'+esc(e.new_value)+'</b>':e&&e.classification==='confirmed'?esc(e.new_value):''}</td>
+  <td>${e?`${e.extraction_confidence} / ${e.value_reliability}`:''}</td><td>${audit}</td>`}
+
+async function record(f,r,utt,lp,attempts,extra={}){
+  const out=await api('/api/call/record',{call_id:callId,seller_id:seller.seller_id,field:f,classification:r.classification,value:r.value,clarity:r.clarity,evidence:(window.proxy?'[answered by a representative] ':'')+(r.evidence||utt),asr_noise:r.asr_noise,utterance:utt,language_probability:lp,contradiction:!!extra.contradiction,attempts,...extra.body});
+  paint(f,out.event);return out.event}
+
+// ------------ conversation manager: reacts to whatever the seller says, like a person would
+const FILLER=/^((h+m+|u+h+m*|u+m+|a+h*|o+h+|e+r+|m+)\s*)+$/i;
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+window.proxy=false;
+/* dialog(question, o) returns one of:
+   {kind:'answer', t|local, utt, lp, attempts}  the seller answered (t = classified turn)
+   {kind:'declined', utt}                        said no twice and chose not to update
+   {kind:'unclear'}                              could not be understood after several tries
+   {kind:'end', outcome, note}                   call should stop (refused, busy -> callback, wrong person, silent)
+   o = {field, pending, localYes, noPolicy:'ask-value'|'decline', name} */
+async function dialog(question,o){
+  let q=question,nos=0,silent=0,unclear=0,digress=0,turns=0,attempts=0,waitingChoice=false,pat=4500,ni=0;
+  while(turns++<12){
+    const heard=await ask(q,pat);attempts++;pat=4500;
+    const utt=heard.transcript,lp=heard.language_probability,hq=norm(utt);
+    if(!utt){silent++;
+      if(silent>=3){await say('Lagta hai line mein kuch dikkat hai. Main thodi der baad dobara call karti hoon. Dhanyavaad.');return{kind:'end',outcome:'silent',note:'no response on the line'}}
+      q=silent===1?'Hello?':'Hello, kya aap meri awaaz sun pa rahe hain?';pat=6000;continue}
+    silent=0;
+    // we asked "update this or leave it?"
+    if(waitingChoice){
+      const c=NO.test(hq)?{choice:'skip'}:YES.test(hq)?{choice:'update'}:await api('/api/call/choice',{utterance:utt});
+      if(c.choice==='update'){waitingChoice=false;nos=0;unclear=0;q=`Theek hai, to sahi ${FIELD_HI[o.field]||'jaankari'} bata dijiye.`;continue}
+      if(c.choice==='skip'||c.choice==='later'){await say(c.choice==='later'?'Theek hai, hum ise baad mein verify kar lenge.':'Theek hai, hum ise abhi jaisa hai waisa hi rehne dete hain.');return{kind:'declined',utt,lp,attempts}}
+      if(++unclear>=2)return{kind:'declined',utt,lp,attempts};
+      q='Maaf kijiye, kya aap ise update karna chahte hain, ya rehne dein?';continue}
+    if(/^(hello|hallo|hi|hey|namaste|namaskar|hello ji|ji hello|haan hello|hello hello)( ji)?$/.test(hq)){q=`Ji namaste! ${question}`;continue}
+    if(o.localYes&&YES.test(hq))return{kind:'answer',local:'confirmed',utt,lp,attempts};
+    if(o.noMeansNone&&NO.test(hq))return{kind:'answer',local:'confirmed',utt,lp,attempts}; // "do you have a website?" -> "nahi hai" is an answer, not a rejection
+    let t;
+    if(NO.test(hq))t={results:[],meta:{type:'no_value',reply:''}};
+    else if(FILLER.test(hq))t={results:[],meta:{type:'noise',reply:''}};
+    else t=await api('/api/call/turn',{seller_id:seller.seller_id,focus:o.field||o.name,question,pending:o.pending||[],utterance:utt});
+    const m=t.meta||{type:'answer',reply:''};
+    if(t.results.length&&!['refuse','busy','wrong_person','proxy'].includes(m.type))return{kind:'answer',t,utt,lp,attempts};
+    switch(m.type){
+      case 'answer':
+        if(!o.field)return{kind:'answer',t,utt,lp,attempts};
+        if(++unclear>=2)return{kind:'unclear',utt,lp,attempts};
+        q=CLARIFY[o.field]||'Maaf kijiye, ek baar phir bata dijiye.';continue;
+      case 'no_value':
+        if(o.noPolicy==='decline')return{kind:'answer',t,utt,lp,attempts,saidNo:true};
+        if(++nos===1){q=pick(`Achha, to sahi ${FIELD_HI[o.field]} kya hai?`,`Theek hai, sahi ${FIELD_HI[o.field]} bata dijiye.`);continue}
+        waitingChoice=true;unclear=0;q='Koi baat nahi. Kya aap is jaankari ko update karna chahte hain, ya ise abhi rehne dein?';continue;
+      case 'repeat':q=`Ji, dobara bolti hoon. ${question}`;continue;
+      case 'hold':await say(m.reply||'Haan ji, koi baat nahi, aap araam se dekh lijiye.');q=null;pat=15000;continue;
+      case 'who':case 'why':case 'question':case 'off_topic':
+        digress++;q=`${m.reply||'Ji.'} ${digress>=3?'Bas kuch hi sawaal hain, jaldi ho jayega. ':''}Toh, ${question}`;continue;
+      case 'proxy':window.proxy=true;await say(m.reply||'Theek hai, koi baat nahi, aap hi bata dijiye.');q=question;continue;
+      case 'busy':{
+        await say(m.reply||'Koi baat nahi, samajh gayi.');
+        const w=await ask('Aapko kis time call karna theek rahega?');
+        await say('Theek hai, hum us waqt dobara call karenge. Dhanyavaad.');
+        return{kind:'end',outcome:'callback',note:w.transcript||''}}
+      case 'not_interested':
+        if(++ni===1){q=`${m.reply||'Ji, samajh sakti hoon.'} Bas do minute ka kaam hai, aur profile sahi hone se buyers aapko seedhe dhoondh paate hain. ${question}`;continue}
+        await say('Bilkul ji, koi baat nahi. Aapka samay dene ke liye bahut shukriya. Namaste!');return{kind:'end',outcome:'not_interested',note:utt};
+      case 'refuse':await say(m.reply||'Maaf kijiye, hum aapko pareshan nahi karenge. Dhanyavaad.');return{kind:'end',outcome:'refused',note:utt};
+      case 'wrong_person':await say('Maaf kijiye, galat number lag gaya. Pareshani ke liye shama. Dhanyavaad.');return{kind:'end',outcome:'wrong_person',note:utt};
+      default: // noise / unintelligible
+        if(++unclear>=3)return{kind:'unclear',utt,lp,attempts};
+        q=unclear===1?'Maaf kijiye, awaaz saaf nahi aayi. Kya aap phir se bol sakte hain?':'Line thodi kharab lag rahi hai. Kya aap thoda saaf bol sakte hain?';continue;
+    }
+  }
+  return{kind:'unclear',attempts};
+}
+
+// ------------ the call, the way a person makes it: wait for "hello", introduce yourself, check it is a good time
+const DLG={localYes:true,noPolicy:'decline'};
+function ring(ms){ // phone ringing while the seller "picks up"
+  $('dstat').textContent='📞 ringing…';
+  const ctx=eng.ctx;if(!ctx)return wait(ms);
+  const beep=(t0)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=425;g.gain.value=0.08;o.connect(g);g.connect(ctx.destination);o.start(ctx.currentTime+t0);o.stop(ctx.currentTime+t0+0.4)};
+  [0,0.6,2.2,2.8].forEach(beep);return wait(ms)}
+async function pickupStep(){ // the person who picks up speaks first ("Hello?"); only then does the caller speak
+  await ring(3600);log('Call','picked up');
+  let d=await listen(9000,8000);
+  if(!d.transcript){await say('Hello?');d=await listen(9000,6000)}
+  if(!d.transcript){await say('Hello, kya aap meri awaaz sun pa rahe hain?');d=await listen(9000,6000)}
+  if(!d.transcript)return{end:{outcome:'no_answer',note:'nobody spoke after pickup'}};
+  return{ok:true,utt:d.transcript}}
+
+async function identityStep(GREET,company){
+  const d=await dialog(GREET,{field:'person_name',name:'identity',pending:[{field:'person_name'}],...DLG});
+  if(d.kind==='end')return{end:d};
+  if(!d.saidNo){
+    const r=d.local?{classification:'confirmed',clarity:'explicit',evidence:d.utt,asr_noise:'clean'}:(d.t?.results||[]).find(x=>x.field==='person_name')||{classification:d.kind==='answer'?'confirmed':'ambiguous',clarity:'hedged',evidence:d.utt||''};
+    return{proceed:true,rec:{r,utt:d.utt||'',lp:d.lp,attempts:d.attempts||1}}}
+  // "no": a wrong number, or the right business with someone else on the phone? a person would find out, not hang up
+  const rec={r:{classification:'unconfirmed',clarity:'explicit',evidence:'Listed contact not confirmed by this speaker: "'+d.utt+'"'},utt:d.utt||'',lp:d.lp,attempts:d.attempts||1};
+  const d2=await dialog(`Oh maaf kijiye. Kya ye ${company} ka hi number hai?`,{field:null,name:'identity2',pending:[],...DLG});
+  if(d2.kind==='end')return{end:d2};
+  if(d2.saidNo||d2.kind!=='answer'){
+    const d3=await dialog(`Achha, shayad number galat lag gaya. Kya aap ${company} ko jaante hain, ya unka sahi number bata sakte hain?`,{field:null,name:'identity3',pending:[],...DLG});
+    if(d3.kind==='end')return{end:d3};
+    await say('Theek hai ji, aapka samay dene ke liye shukriya. Namaste!');
+    return{end:{outcome:'wrong_person',note:d3.utt||d2.utt||d.utt},rec}}
+  window.proxy=true; // right business, someone else answering
+  const d3=await dialog(`Theek hai ji. Kya aap ${company} ke baare mein kuch jaankari confirm kar sakte hain?`,{field:null,name:'identity3',pending:[],...DLG});
+  if(d3.kind==='end')return{end:d3};
+  if(d3.saidNo){const w=await ask('Koi baat nahi ji. Wo kis time available honge, jab main dobara call kar sakun?');await say('Theek hai, hum tab dobara call karenge. Dhanyavaad.');return{end:{outcome:'callback',note:w.transcript||''},rec}}
+  return{proceed:true,rec}}
+
+// "is this a good time?" (and the recording notice): a "no" gets a callback offer, not a hang-up
+async function consentStep(INTRO){
+  const prompts=[INTRO,
+    'Koi baat nahi ji. Bas kuch cheezein confirm karni hain, aapko koi form nahi bharna padega. Kya abhi do minute de sakte hain?'];
+  let last='';
+  for(let i=0;i<prompts.length;i++){
+    const d=await dialog(prompts[i],{field:null,name:'consent',pending:[],...DLG});
+    if(d.kind==='end')return{end:d};
+    last=d.utt||last;
+    let yes=false;
+    if(d.kind==='answer'&&!d.saidNo)yes=d.local==='confirmed'||(await api('/api/interpret',{question:prompts[i],items:[],utterance:d.utt})).intent==='yes';
+    if(yes)return{given:true,text:d.utt||''}}
+  // still no: a person offers a callback instead of pushing. Whatever they answer here is the time (or a final no).
+  const w=await ask('Theek hai ji. Aapko kis time par dobara call karun?');
+  const hq=norm(w.transcript);
+  if(w.transcript&&!NO.test(hq)&&!/^(kabhi nahi|mat karo|mat karna)/.test(hq)){await say('Theek hai ji, hum us waqt dobara call karenge. Dhanyavaad.');return{end:{outcome:'callback',note:w.transcript}}}
+  await say('Bilkul ji, koi baat nahi. Aapka din shubh ho. Namaste!');return{given:false,text:last}}
+
+// finish like a person: summarise, ask if there are questions, say goodbye and let them say bye
+async function closingStep(first,conf,chg){
+  await say(`Bahut shukriya ${first} ji. Maine ${conf} cheezein confirm ki aur ${chg} nayi ya badli hui jaankari note ki hai. Hamari team ek baar check karke profile update kar degi. Kya aapka koi sawaal hai?`);
+  let d=await listen(8000,6000);
+  for(let i=0;i<2&&d.transcript;i++){
+    const hq=norm(d.transcript);
+    if(NO.test(hq)||/^(nahi|bas|koi nahi|nahi ji|theek hai|ok|okay|thank you|thanks|dhanyavaad|shukriya|bye|alright)\b/.test(hq))break;
+    const t=await api('/api/call/turn',{seller_id:seller.seller_id,focus:'closing',question:'Kya aapka koi sawaal hai?',pending:[],utterance:d.transcript});
+    await say(t.meta.reply||'Ji, main ise note kar leti hoon, hamari team aapse sampark karegi.');
+    d=await listen(8000,6000)}
+  await say(`Theek hai ji, aapka din shubh ho. Namaste!`);
+  const bye=await listen(4000,3000);if(bye.transcript)await say('Ji, dhanyavaad. Namaste!')}
+
+// ------------ the call
+$('call').onclick=async()=>{
+  $('call').disabled=true;
+  try{await openMic()}catch(e){alert('Microphone is needed for the call: '+e.message);$('call').disabled=false;return}
+  $('dlog').innerHTML='';$('rows').innerHTML='';Object.keys(rows).forEach(k=>delete rows[k]);transcript=[];asking=0;window.proxy=false;window.consentInfo=null;
+  try{
+    const start=await api('/api/call/start',{seller_id:$('sel').value});seller=start.seller;callId=start.call_id;
+    $('ref').textContent='Reference record: '+seller.fields.map(f=>`${FIELD_LABEL[f.field]}: ${f.value||'—'}`).join(' · ');
+    const todo=['company_name','address','website','products'];const done=new Set();
+    const person=val('person_name'),company=val('company_name');
+    const first=(person||'').split(' ')[0]||'aap';
+    const GREET=`Namaste ji! Main Priya bol rahi hoon, IndiaMART se. Kya main ${person} ji se baat kar rahi hoon?`;
+    const INTRO=`Ji ${first} ji, aapki ${company} ki profile ke baare mein ek chhota sa call hai, bas do minute lagenge. Ye call record ho rahi hai taaki aapki jaankari sahi se update ho sake. Kya abhi baat karna theek rahega?`;
+    [GREET,INTRO,Q.company_name(),Q.address(),Q.website()].forEach(tts);
+
+    // 0. phone rings; the seller says hello first
+    const pk=await pickupStep();if(pk.end)return finish(pk.end);
+    // 1. identity (never hangs up on a single "no")
+    const idr=await identityStep(GREET,company);
+    if(idr.rec)await record('person_name',idr.rec.r,idr.rec.utt,idr.rec.lp,idr.rec.attempts);
+    if(idr.end)return finish(idr.end);
+
+    // 2. consent (asked up to three ways before accepting a refusal)
+    const cs=await consentStep(INTRO);
+    if(cs.end)return finish(cs.end);
+    window.consentInfo={given:cs.given,text:cs.text};
+    $('consent').textContent=(cs.given?'Agreed to talk and be recorded':'Did not agree')+' by voice at '+new Date().toLocaleTimeString()+': "'+(cs.text||'')+'"';
+    if(!cs.given)return finish({outcome:'no_consent',note:cs.text});
+    const productsP=api('/api/call/products',{seller_id:seller.seller_id}); // looked up while the bot asks the next questions
+
+    // 3. field-by-field verification
+    for(const f of todo){
+      if(done.has(f))continue;
+      let sug=null;
+      if(f==='products'){sug=await productsP;seller._sug={value:sug.items.map(i=>i.mcat).join(', '),data:{items:sug.items}};seller._src='enrichment:'+(sug.sources.join('+')||'none')}
+      const question=f==='products'?(sug.items.length?`Hamare paas aapke products ke baare mein ye jaankari hai: ${sug.items.map(i=>i.mcat).join(', ')}. Kya aap yahi bechte hain?`:'Aap kya banate ya bechte hain?'):Q[f]();
+      const body=f==='products'?{previous:seller._sug,original_source:seller._src}:{};
+      let focus=null,utt='',lp=null,attempts=0;
+      for(let round=0;round<2&&!focus;round++){
+        const pend=todo.filter(x=>!done.has(x)).map(x=>({field:x,previous:x==='products'?(seller._sug?.value||''):undefined}));
+        const d2=await dialog(round?CLARIFY[f]:question,{field:f,name:f,pending:pend,localYes:f!=='website'||!!val('website'),noMeansNone:f==='website'&&!val('website'),noPolicy:'ask-value'});
+        if(d2.kind==='end')return finish(d2);
+        attempts+=d2.attempts||1;utt=d2.utt||utt;lp=d2.lp??lp;
+        if(d2.kind==='declined'){focus={classification:'unconfirmed',clarity:'explicit',evidence:'Seller chose not to update ("'+(d2.utt||'')+'")'};break}
+        if(d2.kind==='unclear')break;
+        if(d2.local){focus={classification:'confirmed',clarity:'explicit',evidence:d2.utt,asr_noise:'clean'};break}
+        for(const x of d2.t.results){
+          if(x.field===f){if(x.classification==='ambiguous'&&round===0)continue;focus=x;if(d2.t.contradiction)focus.contradiction=true;continue}
+          if(!done.has(x.field)&&x.classification!=='ambiguous'){await record(x.field,x,utt,lp,1,{contradiction:d2.t.contradiction,body:x.field==='products'?{previous:seller._sug,original_source:seller._src}:{}});done.add(x.field);log('Note','Also captured '+x.field+' from the same answer')}
+        }
+      }
+      if(!focus)focus=utt?{classification:'ambiguous',clarity:'unclear',evidence:utt,asr_noise:'noisy'}:{classification:'not_answered',clarity:'unclear',evidence:''};
+      const e=await record(f,focus,utt,lp,attempts||1,{contradiction:focus.contradiction,body});done.add(f);
+      if(e.classification!=='not_answered')await say(ack(e));
+    }
+    const evs=(await api('/api/seller/'+seller.seller_id)).events.filter(e=>e.call_id===callId);
+    const conf=evs.filter(e=>e.classification==='confirmed').length,chg=evs.filter(e=>['corrected','newly_provided'].includes(e.classification)).length;
+    await closingStep(first,conf,chg);
+    finish({outcome:'completed'});
+  }catch(e){log('error',e.message);closeMic();finish({outcome:'error',note:e.message})}
+  finally{$('call').disabled=false;$('dstat').textContent=''}
+};
+async function finish(info={}){
+  closeMic();
+  if(!(callId&&seller))return;
+  // fields never discussed (call ended early) are recorded as not_answered so the log is complete
+  const have=new Set((await api('/api/seller/'+seller.seller_id)).events.filter(e=>e.call_id===callId).map(e=>e.field));
+  for(const f of ['person_name','company_name','address','website','products'])if(!have.has(f))await record(f,{classification:'not_answered',clarity:'unclear',evidence:''},'',null,0);
+  log('Call',`ended: ${info.outcome||'completed'}${info.note?' — '+info.note:''}`);
+  await api('/api/call/end',{call_id:callId,consent_given:!!window.consentInfo?.given,consent_text:window.consentInfo?.text||'',transcript,outcome:info.outcome||'completed',callback_note:info.outcome==='callback'?info.note:''});
+}
+</script></body></html>

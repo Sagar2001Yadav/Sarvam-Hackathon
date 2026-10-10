@@ -1,0 +1,59 @@
+{
+  "at": "2026-10-09T06:52:55.143Z",
+  "baseScore": {
+    "sellers": 50,
+    "errors": 0,
+    "auto-populated fields %": 94.8,
+    "business name exact %": 92,
+    "city correct %": 78,
+    "state correct %": 86,
+    "pincode correct %": 54,
+    "category precision (strict mcat) %": 22.7,
+    "category precision (mcat/parent/category) %": 69.7,
+    "categories mapped": 66,
+    "avg confidence when correct": 0.82,
+    "avg confidence when wrong": 0.83
+  },
+  "afterScore": {
+    "sellers": 50,
+    "errors": 0,
+    "auto-populated fields %": 94.8,
+    "business name exact %": 92,
+    "city correct %": 78,
+    "state correct %": 86,
+    "pincode correct %": 54,
+    "category precision (strict mcat) %": 17.5,
+    "category precision (mcat/parent/category) %": 71.4,
+    "categories mapped": 63,
+    "avg confidence when correct": 0.82,
+    "avg confidence when wrong": 0.8
+  },
+  "trainFirst": {
+    "sellers": 50,
+    "errors": 0,
+    "auto-populated fields %": 96,
+    "business name exact %": 90,
+    "city correct %": 80,
+    "state correct %": 90,
+    "pincode correct %": 56,
+    "category precision (strict mcat) %": 27,
+    "category precision (mcat/parent/category) %": 64.9,
+    "categories mapped": 74,
+    "avg confidence when correct": 0.85,
+    "avg confidence when wrong": 0.77
+  },
+  "trainAfter": {
+    "sellers": 50,
+    "errors": 0,
+    "auto-populated fields %": 94,
+    "business name exact %": 90,
+    "city correct %": 80,
+    "state correct %": 90,
+    "pincode correct %": 56,
+    "category precision (strict mcat) %": 47.3,
+    "category precision (mcat/parent/category) %": 89.1,
+    "categories mapped": 55,
+    "avg confidence when correct": 0.85,
+    "avg confidence when wrong": 0.75
+  }
+}
